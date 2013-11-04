@@ -1,8 +1,8 @@
 /***
  * Connects the blue box to the red box with touch and finger slide. 
  * The windows backgroundColor and the Label will give action feedback to the user.
- * And, no, the blue box is not going to move anywhere. For now.
  * 
+ * How to take advantage of pointInWindowCoords(), trying to better KISS. 
  * Copyright (c) 2013 Patrick De Marta
  * License MIT
  */
@@ -16,7 +16,6 @@ var objectA = Ti.UI.createView({
 	height:100,
 	top: 50
 });
-var startedTouchA = false;
 
 /**
  * The red box
@@ -27,7 +26,7 @@ var objectB = Ti.UI.createView({
 	height:100,
 	bottom: 50
 });
-var collidedToB = false;
+var collidedWithB = false; // flag the collision with red box 
 
 /**
  * Label for textual feedback
@@ -38,16 +37,6 @@ var label = Ti.UI.createLabel({
 	color:"yellow"
 });
 
-
-/**
- * A transparent view used to listen for touches
- */
-var sensor = Ti.UI.createView({
-	bubbleParent:false,
-	backgroundColor:'transparent'
-});
-
-
 /**
  * The main window
  */
@@ -55,34 +44,28 @@ var win = Ti.UI.createWindow({
 	backgroundColor:"black"
 });
 
-
 /**
- * Behaviours of the sensor view
+ * EventListeners
  *
  *
  * Touch start
- * If touch was over the objectA,
- * rise startedTouchA flag and give feedback!
  */
-sensor.addEventListener('touchstart', function(e){
-	if (touchIsOver(objectA, e)) {
-		startedTouchA = true;
-		win.backgroundColor = "yellow";
-		label.color="black";
-		label.text = "Slide your finger to the red box";
-	}
+objectA.addEventListener('touchstart', function(){
+	win.backgroundColor = "yellow";
+	label.color="black";
+	label.text = "Slide your finger to the red box";
 });
 
 
 /** 
  * Touch move
- * If startedTouchA and finger is over the objectB,
- * rise collidedToB flag and give feedback!
+ * If finger is over the red objectB box,
+ * rise the collision flag and give feedback!
  */
-sensor.addEventListener('touchmove',function(e){
-	if (startedTouchA && touchIsOver(objectB, e)) {
+objectA.addEventListener('touchmove',function(e){
+	if (fingerSlideCollider(objectA, objectB, e)) {
 		win.backgroundColor = "green";
-		collidedToB = true;
+		collidedWithB = true;
 		label.text = "You connected the blue to the red box";
 	}
 });
@@ -90,35 +73,41 @@ sensor.addEventListener('touchmove',function(e){
 /** 
  * Touch end
  * If finger left before getting to the red box, reset the UI.
- * Anyway drop the flags startedTouchA, collidedToB.
+ * Anyway drop the eventually raised collision flag.
  */
-sensor.addEventListener('touchend', function(){
-	if (!collidedToB) {
+objectA.addEventListener('touchend', function(){
+	if (!collidedWithB) {
 		win.backgroundColor = "black";
 		label.color = "yellow";
 		label.text = "Touch the blue box";
 	}
-	startedTouchA = false;
-	collidedToB = false;
+	collidedWithB = false;
 });
 
 
 /**
- * Check if the touch position is over the area of an object
+ * Check if the touch position is over the area of an object,
+ * use pointInWindowCoords() to translate the coords originated by objectA touchMove
+ * into the target objectB coords system.
+ * It's easy then to check if touch falls inside the target object display area,
+ * meaning that the collision occured.
  */
-function touchIsOver(obj, e){
-	var onX = (e.x > obj.rect.x) && (e.x < obj.rect.x + obj.rect.width);
-	var onY = (e.y > obj.rect.y) && (e.y < obj.rect.y + obj.rect.height);
+function fingerSlideCollider(originObj, targetObj, e){
+
+	var pointInWin = originObj.convertPointToView({x:e.x, y:e.y}, targetObj),
+		x = pointInWin.x,
+		y = pointInWin.y,
+
+		onX = (x > 0) && (x < targetObj.rect.width),
+		onY = (y > 0 ) && (y < targetObj.rect.height);
     return (onX && onY);	
 };
 
 /**
- * Add everyting to the window and open it.
- * Note that sensor is the last added, to put it ontop the others, in the zIndex ordering.
+ * Add everything to the window and open it.
  */
 win.add(objectA);
 win.add(objectB);
 win.add(label);
-win.add(sensor);
 
 win.open();
